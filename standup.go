@@ -112,8 +112,7 @@ func NewStandup(slack *Slack, finishTime time.Time, members map[string]*slack.Us
 }
 
 func (s Standup) Start() map[string]*StandupQuestionnaire {
-	standupIsOver := false
-	go s.Slack.StartRealTimeMessagingListener(s.Context, &standupIsOver)
+	go s.Slack.StartRealTimeMessagingListener(s.Context)
 	for member, questions := range s.MemberStandupQuestionnaires {
 		go func(member string, questions *StandupQuestionnaire) {
 			for {
@@ -139,15 +138,15 @@ func (s Standup) Start() map[string]*StandupQuestionnaire {
 			}
 		}(member, questions)
 	}
-	standupIsOver = s.waitForCompletion()
+	s.waitForCompletion()
 	return s.MemberStandupQuestionnaires
 }
 
-func (s Standup) waitForCompletion() bool {
+func (s Standup) waitForCompletion() {
 	for {
 		select {
 		case <-s.Context.Done():
-			return true
+			return
 		case <-time.After(1 * time.Minute):
 			complete := 0
 			for _, questionnaires := range s.MemberStandupQuestionnaires {
@@ -157,9 +156,9 @@ func (s Standup) waitForCompletion() bool {
 			}
 			if complete == len(s.MemberStandupQuestionnaires) {
 				s.CancelFunc()
-				return true
+				return
 			}
-			return false
+			return
 		}
 	}
 }

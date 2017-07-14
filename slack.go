@@ -27,7 +27,7 @@ type Slack struct {
 	BaseMessageParams        slack.PostMessageParameters
 }
 
-func (s *Slack) StartRealTimeMessagingListener(ctx context.Context, standupIsOver *bool) {
+func (s *Slack) StartRealTimeMessagingListener(ctx context.Context) {
 	rtm, s := connect(s, ctx)
 	for msg := range rtm.IncomingEvents {
 		switch event := msg.Data.(type) {
@@ -40,16 +40,17 @@ func (s *Slack) StartRealTimeMessagingListener(ctx context.Context, standupIsOve
 		case *slack.RTMError:
 			log.Printf("Error received on RTM channel: %v", event.Error())
 		case *slack.DisconnectedEvent:
-			if !*standupIsOver {
-				log.Printf("Reconnecting to RTM channel because standup is not over yet, standupIsOver: %+v.\n", *standupIsOver)
+			if ctx.Err() == nil {
+				log.Println("Reconnecting to RTM channel because standup is not over yet.")
 				rtm, _ = connect(s, ctx)
 			} else {
-				log.Printf("Disconnected from RTM channel, standupIsOver: %+v", *standupIsOver)
+				log.Println("Disconnected from RTM channel.")
 				return
 			}
 		}
 	}
 }
+
 func connect(s *Slack, ctx context.Context) (*slack.RTM, *Slack) {
 	rtm := s.apiClient.NewRTM()
 	go rtm.ManageConnection()
