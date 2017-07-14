@@ -158,6 +158,7 @@ func (s Standup) waitForCompletion() {
 				s.CancelFunc()
 				return
 			}
+			return
 		}
 	}
 }
