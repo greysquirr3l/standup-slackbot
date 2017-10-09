@@ -11,17 +11,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
 	"github.com/jawher/mow.cli"
 	"github.com/nlopes/slack"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/utilitywarehouse/go-operational/op"
 )
 
 const (
-	NAME = "standup-slackbot"
-	DESC = "A slackbot for standups"
+	appName = "standup-slackbot"
+	appDesc = "A slackbot for standups"
 )
 
 var (
@@ -29,7 +26,7 @@ var (
 )
 
 func main() {
-	app := cli.App(NAME, DESC)
+	app := cli.App(appName, appDesc)
 	slackToken := app.String(cli.StringOpt{
 		Name:   "slack-token",
 		Desc:   "Slack API token",
@@ -44,6 +41,18 @@ func main() {
 		Name:   "standup-time",
 		Desc:   "The time standup should start in 24hr 00:00 format",
 		EnvVar: "STANDUP_TIME",
+	})
+	owner := app.String(cli.StringOpt{
+		Name:   "owner",
+		Desc:   "The name of the bot owner.",
+		EnvVar: "OWNER",
+		Value:  "telecom",
+	})
+	ownerChannel := app.String(cli.StringOpt{
+		Name:   "owner-channel",
+		Desc:   "The name of the bot owner slack channel.",
+		EnvVar: "OWNER_CHANNEL",
+		Value:  "#telecom",
 	})
 	standupLengthMins := app.Int(cli.IntOpt{
 		Name:   "standup-length-mins",
@@ -70,8 +79,9 @@ func main() {
 		Desc:   "Should we do a standup immediately at launch?",
 	})
 	app.Action = func() {
-		go initialiseHttpServer(*httpPort)
-		var lastStandupDay *int = nil
+		go initHTTPServer(*httpPort, *owner, *ownerChannel)
+
+		var lastStandupDay *int
 		tz, err := time.LoadLocation(*timeZone)
 		if err != nil {
 			log.Fatalf("Error getting location for timezone: %v", err)
@@ -223,27 +233,14 @@ func BuildSlackReport(baseParams slack.PostMessageParameters, questionnaires map
 	return postParams
 }
 
-func initialiseHttpServer(port int) {
-	router := mux.NewRouter()
-
-	router.NewRoute().PathPrefix("/__/").
-		Methods(http.MethodGet).
-		Handler(getOpHandler())
-
-	router.NewRoute().Path("/_/metrics").
-		Methods(http.MethodGet).
-		Handler(promhttp.Handler())
-
-	loggingHandler := handlers.LoggingHandler(os.Stdout, router)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), loggingHandler))
-}
-
-func getOpHandler() http.Handler {
-	return op.NewHandler(
-		op.NewStatus(NAME, DESC).
-			AddOwner("telecom", "#telecom").
-			SetRevision(gitHash).
-			ReadyAlways().
-			AddLink("VCS Repo", "https://github.com/utilitywarehouse/standup-slackbot"),
-	)
+func initHTTPServer(port int, owner, ownerChannel string) {
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), op.NewHandler(op.
+		NewStatus(appName, appDesc).
+		AddOwner(owner, ownerChannel).
+		AddLink("vcs", fmt.Sprintf("https://github.com/utilitywarehouse/%s", appName)).
+		SetRevision(gitHash).
+		ReadyUseHealthCheck(),
+	)); err != nil {
+		log.Fatal("ops server has shut down")
+	}
 }
