@@ -239,7 +239,7 @@ func initHTTPServer(port int, owner, ownerChannel string) {
 		AddOwner(owner, ownerChannel).
 		AddLink("vcs", fmt.Sprintf("https://github.com/utilitywarehouse/%s", appName)).
 		SetRevision(gitHash).
-		ReadyUseHealthCheck(),
+		ReadyAlways(),
 	)); err != nil {
 		log.Fatal("ops server has shut down")
 	}
