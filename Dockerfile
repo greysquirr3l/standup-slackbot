@@ -1,11 +1,13 @@
-FROM alpine
+FROM golang:1.9-alpine as build
+RUN apk add --no-cache ca-certificates tzdata git
 
-RUN apk add --no-cache ca-certificates tzdata
+COPY . /go/src/standup-slackbot
+WORKDIR /go/src/standup-slackbot
+RUN go get -v
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o standup-slackbot .
 
-RUN mkdir /app
-
-WORKDIR /app
-
-ADD standup-slackbot standup-slackbot
-
-CMD ./standup-slackbot
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates
+WORKDIR /root/
+COPY --from=build /go/src/standup-slackbot/standup-slackbot .
+CMD ["./standup-slackbot"]

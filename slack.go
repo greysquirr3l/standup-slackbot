@@ -101,6 +101,23 @@ func (s *Slack) GetChannelMembers(channelId string) (map[string]*slack.User, err
 	return members, nil
 }
 
+func (s *Slack) GetGroupMembers(channelId string) (map[string]*slack.User, error) {
+	members := make(map[string]*slack.User)
+	group, err := s.apiClient.GetGroupInfo(channelId)
+	if err != nil {
+		return members, fmt.Errorf("Error fetching channel info: %v", err)
+	}
+	for _, member := range group.Members {
+		memberInfo, err := s.apiClient.GetUserInfo(member)
+		if err != nil {
+			return members, fmt.Errorf("Error getting member info for %s: %v", member, err)
+		}
+		members[member] = memberInfo
+	}
+
+	return members, nil
+}
+
 func (s *Slack) AskQuestion(member string, question string, ctx context.Context) QuestionResponse {
 	respChan := make(chan QuestionResponse, 0)
 	questionTs, err := s.SendMessage(member, question)
@@ -158,6 +175,20 @@ func (s *Slack) GetChannelIdForChannel(channelName string) (*string, error) {
 			return &channel.ID, nil
 		}
 	}
+	return nil, errors.New("Channel not found")
+}
+
+func (s *Slack) GetGroupIdForGroup(groupName string) (*string, error) {
+	groups, err := s.apiClient.GetGroups(true)
+	if err != nil {
+		return nil, fmt.Errorf("Error getting private channel list: %v", err)
+	}
+	for _, group := range groups {
+		if group.Name == groupName {
+			return &group.ID, nil
+		}
+	}
+
 	return nil, errors.New("Channel not found")
 }
 

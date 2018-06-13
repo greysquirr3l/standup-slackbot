@@ -37,6 +37,12 @@ func main() {
 		Desc:   "The Slack channel to use for standups",
 		EnvVar: "STANDUP_CHANNEL",
 	})
+	privateGroup := app.Bool(cli.BoolOpt{
+					Name:		"private",
+					Desc:		"Slack channel is private",
+					EnvVar:	"PRIVATE_CHANNEL",
+					Value:	false,
+	})
 	standupTime := app.String(cli.StringOpt{
 		Name:   "standup-time",
 		Desc:   "The time standup should start in 24hr 00:00 format",
@@ -46,7 +52,7 @@ func main() {
 		Name:   "owner",
 		Desc:   "The name of the bot owner.",
 		EnvVar: "OWNER",
-		Value:  "telecom",
+		Value:  "ncampbell",
 	})
 	ownerChannel := app.String(cli.StringOpt{
 		Name:   "owner-channel",
@@ -70,7 +76,7 @@ func main() {
 		Name:   "time-zone",
 		Desc:   "The timezone IANA format e.g. Europe/London",
 		EnvVar: "TIME_ZONE",
-		Value:  "Europe/London",
+		Value:  "America/Detroit",
 	})
 	doImmediately := app.Bool(cli.BoolOpt{
 		Name:   "do-standup-immediately",
@@ -91,7 +97,7 @@ func main() {
 			now := time.Now().In(tz)
 			day := now.Day()
 			if *doImmediately && lastStandupDay == nil {
-				if err := DoStandup(*slackToken, *standupChannelName, *standupLengthMins); err != nil {
+				if err := DoStandup(*slackToken, *standupChannelName, *standupLengthMins, *privateGroup); err != nil {
 					log.Fatalf("Error doing standup: %v", err)
 				}
 				lastStandupDay = &day
@@ -156,7 +162,13 @@ func parseStandupStartTime(standupTime *string) (*int, *int, error) {
 	return &hourInt, &minsInt, nil
 }
 
-func DoStandup(slackToken string, standupChannelName string, standupLengthMins int) error {
+func DoStandup(slackToken string, standupChannelName string, standupLengthMins int, privateGroup bool) error {
+	var (
+							members map[string]*slack.User
+							channelId	*string
+							err error
+	)
+
 	baseParams := slack.NewPostMessageParameters()
 	baseParams.Username = "Standup Bot"
 
@@ -168,21 +180,31 @@ func DoStandup(slackToken string, standupChannelName string, standupLengthMins i
 		baseParams,
 	}
 
-	channelId, err := slackClient.GetChannelIdForChannel(standupChannelName)
-	if err != nil {
-		return fmt.Errorf("Could not get channel ID for channel %s: %v", standupChannelName, err)
-	}
-
-	members, err := slackClient.GetChannelMembers(*channelId)
-	if err != nil {
-		return fmt.Errorf("Error getting standup channel members: %v", err)
-	}
+	if privateGroup == true {
+			channelId, err = slackClient.GetGroupIdForGroup(standupChannelName)
+			if err != nil {
+				return fmt.Errorf("Could not get channel ID for channel %s: %v", standupChannelName, err)
+			}
+			members, err = slackClient.GetGroupMembers(*channelId)
+			if err != nil {
+				return fmt.Errorf("Error getting standup channel members: %v", err)
+			}
+		} else {
+			channelId, err = slackClient.GetChannelIdForChannel(standupChannelName)
+			if err != nil {
+				return fmt.Errorf("Could not get channel ID for channel %s: %v", standupChannelName, err)
+			}
+			members, err = slackClient.GetChannelMembers(*channelId)
+			if err != nil {
+				return fmt.Errorf("Error getting standup channel members: %v", err)
+			}
+		}
 
 	standup := NewStandup(slackClient, time.Now().Add(time.Minute*time.Duration(standupLengthMins)), members)
 	results := standup.Start()
 
 	for i := 0; i < 5; i++ {
-		_, _, err = slackClient.apiClient.PostMessage(
+		_, _, err := slackClient.apiClient.PostMessage(
 			*channelId,
 			"Standup is finished, keep up the good work team!",
 			BuildSlackReport(baseParams, results),
