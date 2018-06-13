@@ -52,7 +52,7 @@ func main() {
 		Name:   "owner",
 		Desc:   "The name of the bot owner.",
 		EnvVar: "OWNER",
-		Value:  "ncampbell",
+		Value:  "",
 	})
 	ownerChannel := app.String(cli.StringOpt{
 		Name:   "owner-channel",
