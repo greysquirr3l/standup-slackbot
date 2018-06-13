@@ -58,7 +58,7 @@ func main() {
 		Name:   "owner-channel",
 		Desc:   "The name of the bot owner slack channel.",
 		EnvVar: "OWNER_CHANNEL",
-		Value:  "#telecom",
+		Value:  "",
 	})
 	standupLengthMins := app.Int(cli.IntOpt{
 		Name:   "standup-length-mins",
