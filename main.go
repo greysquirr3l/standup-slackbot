@@ -137,7 +137,7 @@ func main() {
 				continue
 			}
 
-			if err := DoStandup(*slackToken, *standupChannelName, *standupLengthMins); err != nil {
+			if err := DoStandup(*slackToken, *standupChannelName, *standupLengthMins, *privateGroup); err != nil {
 				log.Fatalf("Error doing standup: %v", err)
 			}
 
